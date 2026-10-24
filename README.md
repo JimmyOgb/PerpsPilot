@@ -129,7 +129,7 @@ flowchart TD
 
 ## 🌐 Network & Protocol Integration
 
-PerpsPilot connects directly to the official Somnia Hideki Testnet (Tokyo v2). Parameters verified directly from live contracts at Block `#31,888,000+`:
+PerpsPilot connects directly to the official Somnia Hideki Testnet (Tokyo v2). Parameters verified directly from live contracts at Block `#31,937,000+`:
 
 | Parameter | Authoritative Value | Source / Verification Method |
 |:---|:---|:---|
@@ -279,7 +279,7 @@ Commands executed and verified in the current workspace:
 - **Target Market:** `ETH-PERP` (`ETH:USDSO`)
 - **Order Side:** `LONG` (Bid)
 - **Order Type:** `LIMIT` (`orderType: 0`)
-- **Limit Price:** Authoritative instantaneous mark price (~`$2,363.15 USDso`, aligned to `$0.01` tick)
+- **Limit Price:** Authoritative instantaneous mark price (~`$2,366.40 USDso`, aligned to `$0.01` tick)
 - **Order Quantity:** `0.0084 ETH` (aligned to `0.0001 ETH` lot; exactly 2.1x the minimum quantity of 0.0040 ETH)
 - **Effective Notional:** `~$19.85 USDso`
 - **Initial Margin Requirement:** `~$0.99 USDso` (5% IMF base)

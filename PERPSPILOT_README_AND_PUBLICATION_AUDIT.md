@@ -81,8 +81,8 @@ All tests executed with **exit code 0** on Somnia Hideki Testnet:
 | **Deterministic Unit Tests** | `tests/risk.test.ts` | 5 | **PASS** | Validates 500 bps IMF (20x max), min qty (`0.0040 ETH`), position caps. |
 | **Deterministic Unit Tests** | `tests/preflight.test.ts` | 2 | **PASS** | Validates safe `BLOCKED` status when signer credentials are absent. |
 | **Live Network Integration** | `tests/network.test.ts` | 3 | **PASS** | Live RPC chain ID assertion, factory discovery of 21 perp pools, ETH-PERP mark oracle priceability. |
-| **System Diagnostics** | `npm run doctor` | 8 checks | **7 PASS / 1 BLOCKED** | Environment, RPC, Indexer, Target Pool, Sizing, Oracle Health. |
-| **Pre-Trade Preflight** | `npm run preflight` | 8 checks | **3 PASS / 5 BLOCKED** | Sizes $20 notional order; reports 3-tier margin state safely in read-only mode. |
+| **System Diagnostics** | `npm run doctor` | 8 checks | **7 PASS / 1 BLOCKED** | Environment, RPC, Indexer, Target Pool, Sizing, Oracle Health (Block #31936525, Mark $2366.33). |
+| **Pre-Trade Preflight** | `npm run preflight` | 8 checks | **3 PASS / 5 BLOCKED** | Sizes $20 notional order (0.0084 ETH @ $2366.40, Block #31937000); reports 3-tier margin safely in read-only mode. |
 
 ---
 
