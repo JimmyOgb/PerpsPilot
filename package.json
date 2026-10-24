@@ -1,0 +1,27 @@
+{
+  "name": "perps-pilot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PerpsPilot — Explainable Perpetuals Trading Copilot for dreamDEX on Somnia Hideki Testnet",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "diagnostics": "tsx src/diagnostics/runDiagnostics.ts",
+    "doctor": "tsx src/diagnostics/runDiagnostics.ts",
+    "preflight": "tsx src/diagnostics/runAccountPreflight.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@somnia-chain/markets-sdk": "0.32.1",
+    "dotenv": "^16.4.5",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.1"
+  }
+}

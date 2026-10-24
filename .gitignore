@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+
+# Unpacked reference package (kept locally for inspection, do not track)
+package/
+
+# Logs and runtime artifacts
+*.log
+npm-debug.log*
+
+# System and IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
