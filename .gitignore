@@ -3,10 +3,12 @@ node_modules/
 
 # Build output
 dist/
+dist-frontend/
 
 # Environment files and secrets
 .env
 .env.*
+.env*
 !.env.example
 
 # Unpacked reference package (kept locally for inspection, do not track)
@@ -21,3 +23,7 @@ npm-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# Vercel CLI local state
+.vercel
+.vercel/

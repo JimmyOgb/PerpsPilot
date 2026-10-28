@@ -310,7 +310,22 @@ export async function runAccountPreflight(): Promise<void> {
   const humanPrice = formatQuotePrice(alignedPrice);
   const actualNotional = (sizing.quantity * alignedPrice) / 10n ** 18n;
   const humanNotional = formatUnits(actualNotional, 18);
-  const initialMarginReq = (actualNotional * BigInt(targetMarket.initialMarginBps)) / 10000n;
+
+  // 1. Protocol minimum floor (e.g. 500 bps = 5% IMF base at 20x max leverage)
+  const protocolMinMargin = (actualNotional * BigInt(targetMarket.initialMarginBps)) / 10000n;
+  const humanProtocolMin = formatUnits(protocolMinMargin, 18);
+
+  // 2. User configured target margin (e.g. 2x leverage = 50% margin)
+  const userLeverageBps = BigInt(Math.round(10000 / config.perpLeverage));
+  const configuredMarginReq = (actualNotional * userLeverageBps) / 10000n;
+  const humanConfiguredMargin = formatUnits(configuredMarginReq, 18);
+
+  // 3. Leverage surcharge required to enforce conservative 2x leverage on a 20x market
+  const leverageSurcharge = configuredMarginReq > protocolMinMargin ? configuredMarginReq - protocolMinMargin : 0n;
+  const humanSurcharge = formatUnits(leverageSurcharge, 18);
+
+  // Effective required collateral enforced for order placement
+  const initialMarginReq = configuredMarginReq > protocolMinMargin ? configuredMarginReq : protocolMinMargin;
   const humanIMReq = formatUnits(initialMarginReq, 18);
 
   console.log("\n================================================================================");
@@ -325,7 +340,10 @@ export async function runAccountPreflight(): Promise<void> {
   console.log(`  Calculated Quantity : ${humanQty} ${targetMarket.baseSymbol} (Aligned to lot ${formatUnits(targetMarket.lotSize, targetMarket.baseDecimals)})`);
   console.log(`  Estimated Notional  : $${humanNotional} USDso`);
   console.log(`  Configured Leverage : ${config.perpLeverage}x (Market Maximum: ${targetMarket.maxLeverage}x)`);
-  console.log(`  Initial Margin Req  : ~$${humanIMReq} USDso (5% IMF base at 20x max leverage)`);
+  console.log(`  Protocol Margin Flr : ~$${humanProtocolMin} USDso (${targetMarket.initialMarginBps / 100}% IMF base at ${targetMarket.maxLeverage}x max leverage)`);
+  console.log(`  Configured Target IM: ~$${humanConfiguredMargin} USDso (${(100 / config.perpLeverage).toFixed(1)}% margin target at ${config.perpLeverage}x leverage)`);
+  console.log(`  Leverage Surcharge  : ~$${humanSurcharge} USDso (Enforces ${config.perpLeverage}x conservative leverage)`);
+  console.log(`  Required Collateral : ~$${humanIMReq} USDso (Enforced in MarginBank)`);
   console.log(`  Market Minimum Qty  : ${formatUnits(targetMarket.minQuantity, targetMarket.baseDecimals)} ${targetMarket.baseSymbol} (~$${formatUnits((targetMarket.minQuantity * alignedPrice) / 10n ** 18n, 18)} USDso)`);
   console.log(`  Market Max Position : 399.5612 ETH (~$943,000 USDso)`);
   console.log(`  Precision Check     : ${precisionCheck.valid ? "VALID" : `INVALID: ${precisionCheck.error}`}`);

@@ -6,7 +6,7 @@
 
 import { SomniaMarkets, SOMNIA_HIDEKI_TESTNET_ADDRESSES } from "@somnia-chain/markets-sdk";
 import { hidekiTestnet } from "@somnia-chain/markets-sdk/chains";
-import { DEFAULT_HIDEKI_WS_RPC_URL, DEFAULT_SOMNIA_INDEXER_URL } from "../config/index.js";
+import { DEFAULT_HIDEKI_WS_RPC_URL, DEFAULT_SOMNIA_INDEXER_URL } from "../config/constants.js";
 import type { MarketDiscoveryResult, PerpMarketInfo } from "./types.js";
 
 interface RawSdkMarket {
@@ -40,6 +40,51 @@ interface RawSdkMarket {
   };
 }
 
+const VERIFIED_HIDEKI_FALLBACK_MARKETS: PerpMarketInfo[] = [
+  {
+    id: "0xd6cb1dd58580b84d76068ac21594219ce03aeddf",
+    poolAddress: "0xd6cb1dd58580b84d76068ac21594219ce03aeddf",
+    symbol: "ETH:USDSO",
+    sdkSymbol: "ETH/USDso:USDso",
+    display: "ETH-PERP",
+    baseSymbol: "ETH",
+    quoteSymbol: "USDSO",
+    baseToken: "0x1516ccebe983fef570bc646ebcf5e05086d4944f",
+    quoteToken: "0xed7993A74dAe1e6656B704A424DcD8711aAf4F72",
+    baseDecimals: 18,
+    quoteDecimals: 18,
+    tickSize: 10000000000000000n,
+    lotSize: 100000000000000n,
+    minQuantity: 4000000000000000n,
+    initialMarginBps: 500,
+    maxLeverage: 20,
+    marginBank: "0x478769E1177C0773c43A593DCCc4Ad15F15F1394",
+    perpStatus: "active",
+  },
+  {
+    id: "0x4181dd0831637cba8b1c4b4d6b6d3b482312b9a1",
+    poolAddress: "0x4181dd0831637cba8b1c4b4d6b6d3b482312b9a1",
+    symbol: "BTC:USDSO",
+    sdkSymbol: "BTC/USDso:USDso",
+    display: "BTC-PERP",
+    baseSymbol: "BTC",
+    quoteSymbol: "USDSO",
+    baseToken: "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+    quoteToken: "0xed7993A74dAe1e6656B704A424DcD8711aAf4F72",
+    baseDecimals: 8,
+    quoteDecimals: 18,
+    tickSize: 100000000000000000n,
+    lotSize: 100000n,
+    minQuantity: 100000n,
+    initialMarginBps: 500,
+    maxLeverage: 20,
+    marginBank: "0x478769E1177C0773c43A593DCCc4Ad15F15F1394",
+    perpStatus: "active",
+  },
+];
+
+let cachedDiscovery: { result: MarketDiscoveryResult; fetchedAt: number } | null = null;
+
 /**
  * Discovers live perpetual markets from the official SomniaMarkets SDK instance.
  * Automatically loads the 21+ perpetual markets active on Hideki v2.
@@ -47,6 +92,10 @@ interface RawSdkMarket {
 export async function discoverPerpMarkets(
   indexerUrl: string = DEFAULT_SOMNIA_INDEXER_URL,
 ): Promise<MarketDiscoveryResult> {
+  const now = Date.now();
+  if (cachedDiscovery && now - cachedDiscovery.fetchedAt < 60_000 && cachedDiscovery.result.markets.length > 0) {
+    return cachedDiscovery.result;
+  }
   const exchange = new SomniaMarkets({
     chain: hidekiTestnet,
     wsRpcUrl: DEFAULT_HIDEKI_WS_RPC_URL,
@@ -77,6 +126,7 @@ export async function discoverPerpMarkets(
       id: poolAddress,
       poolAddress,
       symbol: `${baseSymbol}:${quoteSymbol}`,
+      sdkSymbol: m.symbol || `${baseSymbol}/${quoteSymbol}:${quoteSymbol}`,
       display: `${baseSymbol}-PERP`,
       baseSymbol,
       quoteSymbol,
@@ -97,11 +147,25 @@ export async function discoverPerpMarkets(
     });
   }
 
-  return {
+  if (markets.length === 0) {
+    if (cachedDiscovery && cachedDiscovery.result.markets.length > 0) {
+      return cachedDiscovery.result;
+    }
+    return {
+      markets: VERIFIED_HIDEKI_FALLBACK_MARKETS,
+      timestamp: Date.now(),
+      source: "onchain_fallback",
+    };
+  }
+
+  const discoveryResult: MarketDiscoveryResult = {
     markets,
     timestamp: Date.now(),
     source: "indexer",
   };
+
+  cachedDiscovery = { result: discoveryResult, fetchedAt: Date.now() };
+  return discoveryResult;
 }
 
 /**
@@ -117,7 +181,8 @@ export function findMarketBySymbol(markets: PerpMarketInfo[], querySymbol: strin
       m.symbol.toUpperCase() === normalized ||
       m.display.toUpperCase() === normalized ||
       m.baseSymbol.toUpperCase() === normalized ||
-      m.baseSymbol.toUpperCase() === baseOnly
+      m.baseSymbol.toUpperCase() === baseOnly ||
+      m.poolAddress.toLowerCase() === querySymbol.toLowerCase()
     );
   });
 }

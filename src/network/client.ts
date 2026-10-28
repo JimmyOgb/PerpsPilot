@@ -7,7 +7,7 @@
 import { createPublicClient, http, type Hex, type PublicClient } from "viem";
 import { hidekiTestnet } from "@somnia-chain/markets-sdk/chains";
 import { SomniaMarkets, SOMNIA_HIDEKI_TESTNET_ADDRESSES } from "@somnia-chain/markets-sdk";
-import { EXPECTED_HIDEKI_CHAIN_ID, DEFAULT_HIDEKI_RPC_URL, DEFAULT_HIDEKI_WS_RPC_URL, DEFAULT_SOMNIA_INDEXER_URL } from "../config/index.js";
+import { EXPECTED_HIDEKI_CHAIN_ID, DEFAULT_HIDEKI_RPC_URL, DEFAULT_HIDEKI_WS_RPC_URL, DEFAULT_SOMNIA_INDEXER_URL } from "../config/constants.js";
 
 export interface NetworkStatus {
   connected: boolean;

@@ -5,9 +5,19 @@
  */
 
 import dotenv from "dotenv";
+import {
+  EXPECTED_HIDEKI_CHAIN_ID,
+  DEFAULT_HIDEKI_RPC_URL,
+  DEFAULT_HIDEKI_WS_RPC_URL,
+  DEFAULT_SOMNIA_INDEXER_URL,
+} from "./constants.js";
 
-// Load environment variables from .env if present
-dotenv.config();
+export * from "./constants.js";
+
+// Load environment variables from .env if present in Node environment
+if (typeof process !== "undefined" && typeof process.cwd === "function") {
+  dotenv.config();
+}
 
 export interface PerpsPilotConfig {
   network: string;
@@ -33,14 +43,6 @@ export class ConfigValidationError extends Error {
     this.name = "ConfigValidationError";
   }
 }
-
-/** Verified Somnia Hideki Testnet Chain ID */
-export const EXPECTED_HIDEKI_CHAIN_ID = 50383;
-
-/** Default Official Hideki v2 Endpoints */
-export const DEFAULT_HIDEKI_RPC_URL = "https://api.hideki2.infra.testnet.somnia.network";
-export const DEFAULT_HIDEKI_WS_RPC_URL = "wss://api.hideki2.infra.testnet.somnia.network/ws";
-export const DEFAULT_SOMNIA_INDEXER_URL = "https://hideki-dev.smk.somnia.host/v1/graphql";
 
 /**
  * Loads, normalizes, and strictly validates application configuration.

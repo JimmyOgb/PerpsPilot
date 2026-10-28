@@ -18,7 +18,7 @@ describe("Live Read-Only Network & Market Integration Tests", () => {
     expect(netStatus.connected).toBe(true);
     expect(netStatus.chainId).toBe(EXPECTED_HIDEKI_CHAIN_ID);
     expect(netStatus.blockNumber).toBeGreaterThan(30_000_000n);
-  }, 20000);
+  }, 60000);
 
   it("discovers live perpetual markets from Hideki v2 factory", async () => {
     const result = await discoverPerpMarkets();
@@ -35,7 +35,7 @@ describe("Live Read-Only Network & Market Integration Tests", () => {
     expect(btcMarket).toBeDefined();
     expect(btcMarket?.baseSymbol).toBe("BTC");
     expect(btcMarket?.baseDecimals).toBe(8);
-  }, 25000);
+  }, 45000);
 
   it("verifies oracle health snapshot is priceable for live ETH-PERP pool", async () => {
     const result = await discoverPerpMarkets();

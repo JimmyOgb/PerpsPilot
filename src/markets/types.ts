@@ -9,6 +9,8 @@ export interface PerpMarketInfo {
   poolAddress: `0x${string}`;
   /** Canonical symbol string, e.g. "ETH:USDso" */
   symbol: string;
+  /** SDK unified symbol string, e.g. "ETH/USDso:USDso" */
+  sdkSymbol?: string;
   /** Trader-friendly display name, e.g. "ETH-PERP" */
   display: string;
   baseSymbol: string;
