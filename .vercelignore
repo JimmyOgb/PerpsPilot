@@ -6,3 +6,9 @@ docs
 *.log
 *.md
 !README.md
+dist
+dist-frontend
+package
+scratch
+.agents
+**/*.map
