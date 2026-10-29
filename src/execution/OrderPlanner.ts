@@ -1,12 +1,10 @@
-import { sha256, toHex, type Address } from "viem";
+import { sha256, toHex, parseUnits, formatUnits, type Address } from "viem";
 import type { PerpMarketInfo } from "../markets/types.js";
 import { EXPECTED_HIDEKI_CHAIN_ID } from "../config/constants.js";
 import { calculateGtcExpiryNs } from "./LiveOrderAdapter.js";
 import {
   alignPrice,
   alignQuantity,
-  formatQuotePrice,
-  formatBaseQuantity,
   validateOrderPrecision,
 } from "../markets/precision.js";
 import type {
@@ -103,22 +101,47 @@ export class OrderPlanner {
       );
     }
 
+    // 0.1 Strict order type validation
+    if (
+      params.orderType !== "LIMIT" &&
+      params.orderType !== "POST_ONLY" &&
+      params.orderType !== "MARKET" &&
+      params.orderType !== "FILL_OR_KILL"
+    ) {
+      errors.push(`Invalid or unsupported order type '${params.orderType}'.`);
+    }
+
     // 1. Chain validation
     if (chainId !== EXPECTED_HIDEKI_CHAIN_ID) {
       errors.push(`Chain ID mismatch: expected ${EXPECTED_HIDEKI_CHAIN_ID}, got ${chainId}`);
     }
 
-    // 2. Quantization to market grid
-    const priceScale = 10n ** BigInt(params.market.quoteDecimals);
-    const baseScale = 10n ** BigInt(params.market.baseDecimals);
+    // 2. Quantization to market grid using market-specific decimals (no hardcoded 18dp for base)
+    const quoteDecimals = params.market.quoteDecimals || 18;
+    const baseDecimals = params.market.baseDecimals || 18;
 
-    const priceRaw = BigInt(Math.round(params.price * 1e6)) * (priceScale / 1_000_000n);
+    // Reject non-finite, negative or zero inputs
+    if (!Number.isFinite(params.price) || params.price <= 0) {
+      errors.push(`Price must be a positive finite number, got: ${params.price}`);
+    }
+    if (!Number.isFinite(params.quantity) || params.quantity <= 0) {
+      errors.push(`Quantity must be a positive finite number, got: ${params.quantity}`);
+    }
+
+    const safePrice = Number.isFinite(params.price) && params.price > 0 ? params.price : 1;
+    const safeQty = Number.isFinite(params.quantity) && params.quantity > 0 ? params.quantity : 0;
+
+    // Price scaling: convert price to quote units (18 decimals for USDso)
+    const priceStr = safePrice.toFixed(Math.min(quoteDecimals, 8));
+    const priceRaw = parseUnits(priceStr, quoteDecimals);
     const alignedPriceRaw = alignPrice(priceRaw, params.market.tickSize);
-    const alignedPriceHuman = parseFloat(formatQuotePrice(alignedPriceRaw));
+    const alignedPriceHuman = parseFloat(formatUnits(alignedPriceRaw, quoteDecimals));
 
-    const qtyRaw = BigInt(Math.round(params.quantity * 1e8)) * (baseScale / 100_000_000n);
+    // Quantity scaling: convert quantity to base asset native decimals (e.g. 18 for ETH, 8 for BTC, 9 for SOL)
+    const qtyStr = safeQty.toFixed(Math.min(baseDecimals, 8));
+    const qtyRaw = parseUnits(qtyStr, baseDecimals);
     const snappedQtyRaw = alignQuantity(qtyRaw, params.market.lotSize);
-    const snappedQtyHuman = parseFloat(formatBaseQuantity(snappedQtyRaw, params.market.baseDecimals));
+    const snappedQtyHuman = parseFloat(formatUnits(snappedQtyRaw, baseDecimals));
 
     // 3. Precision validation
     const precisionCheck = validateOrderPrecision(alignedPriceRaw, snappedQtyRaw, params.market);
@@ -129,7 +152,7 @@ export class OrderPlanner {
     // 4. Minimum quantity check
     if (snappedQtyRaw < params.market.minQuantity) {
       errors.push(
-        `Quantity (${snappedQtyHuman} ${params.market.baseSymbol}) is below market minimum (${formatBaseQuantity(params.market.minQuantity, params.market.baseDecimals)})`,
+        `Quantity (${snappedQtyHuman} ${params.market.baseSymbol}) is below market minimum (${formatUnits(params.market.minQuantity, baseDecimals)})`,
       );
     }
 
@@ -160,7 +183,6 @@ export class OrderPlanner {
     const expireTimestampNs = calculateGtcExpiryNs(now);
 
     // 7. Reduce-Only protocol status documentation
-    // Direct PerpPool limit orders do NOT support native on-chain reduceOnly in the smart contract ABI.
     const nativeReduceOnlySupported = false;
     const reduceOnly = false; // By default an open-order plan is opening
 

@@ -40,6 +40,15 @@ export const PERP_POOL_READ_ABI = parseAbi([
   'function getPerpPoolParameters() view returns ((uint256 initialMarginBps, uint256 maintenanceMarginBps, uint256 closeOutMarginBps, uint256 maxOpenInterest, uint256 maxPositionSize, uint256 takerFeeBpsTimes1k, int256 makerFeeBpsTimes1k, uint256 insuranceFundShareBps))',
 ]);
 
+export const MARGIN_BANK_POSITION_READ_ABI = parseAbi([
+  'function getPosition(address account, address perpPool) view returns ((int128 size, uint128 avgEntryPrice, int256 entryFundingIndex, uint64 lastUpdatedTimestampNs))',
+]);
+
+export const POOL_ORDERS_ABI = parseAbi([
+  'function getOwnOpenOrders() view returns (uint128[])',
+  'function getOrder(uint128 orderId) view returns ((uint128 orderId, bool isBid, address owner, uint64 userData, uint256 price, uint256 fullQuantity, uint256 quantityRemaining, uint64 expireTimestampNs))',
+]);
+
 // Keep backwards-compatibility alias for health abi
 export const PERP_POOL_HEALTH_ABI = PERP_POOL_READ_ABI;
 

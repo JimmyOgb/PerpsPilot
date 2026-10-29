@@ -88,12 +88,12 @@
 
 ---
 
-### Scene 4: Three-Tier Collateral Model & Order Execution (1:55 – 2:20)
-- **Visual:** Display architecture graphic showing the 3 Fund Tiers.
+### Scene 4: Three-Tier Collateral Model & Live Execution (1:55 – 2:20)
+- **Visual:** Display architecture graphic showing the 3 Fund Tiers, followed by live terminal testnet execution and the on-chain evidence panel.
 - **Narrator Script:**
   > *"PerpsPilot eliminates a major pain point in dreamDEX development: the distinction between liquid wallet tokens and MarginBank collateral.  
   > Liquid USDso in your wallet cannot back perps until deposited into MarginBank. PerpsPilot validates all three tiers: native STT for gas, liquid USDso for deposits, and MarginBank equity for cross-margin backing.  
-  > [STAGE D NOTE: When live execution is authorized, the order will be submitted, and the resulting block inclusion and fill receipt will be verified on-chain]." (Execution marked pending until authorized).*
+  > In live mode, PerpsPilot enforces the mandatory 8-gate ExecutionGuard pipeline before requesting a wallet signature. On Somnia Hideki v2, our verified order placement and cancellation transactions demonstrate full lifecycle integrity: placing a maker POST_ONLY order, locking margin, verifying book resting state, and releasing collateral upon cancellation."*
 
 ---
 

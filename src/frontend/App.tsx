@@ -172,6 +172,7 @@ export const App: React.FC = () => {
             <DiagnosticsView
               wallet={wallet}
               currentBlock={currentBlock}
+              market={selectedMarket}
             />
           </div>
         )}
@@ -186,6 +187,7 @@ export const App: React.FC = () => {
           isLiveMode={isLiveModeForModal}
           wallet={wallet}
           getWalletClient={getWalletClient}
+          market={selectedMarket}
         />
       )}
     </div>

@@ -253,6 +253,29 @@ export class LiveOrderAdapter {
   }
 
   /**
+   * Constructs an unsigned call for PerpPool.cancelOrder.
+   */
+  public prepareCancelOrderCall(poolAddress: Address, orderId: bigint): {
+    to: Address;
+    data: Hex;
+    description: string;
+  } {
+    if (orderId <= 0n) {
+      throw new Error("[LiveOrderAdapter] Invalid orderId for cancellation");
+    }
+    const data = encodeFunctionData({
+      abi: PERP_POOL_PLACE_ORDER_ABI,
+      functionName: "cancelOrder",
+      args: [orderId],
+    });
+    return {
+      to: poolAddress,
+      data,
+      description: `Cancel perp order ${orderId.toString()} on pool ${poolAddress}`,
+    };
+  }
+
+  /**
    * Phase 2: Authorization & Execution Guard Assertion.
    * Fails closed if DRY_RUN=true, plan is expired, or digest mismatch occurs.
    */

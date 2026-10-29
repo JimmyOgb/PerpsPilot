@@ -31,15 +31,12 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
           </p>
         </div>
 
-        <a
-          href={`${SOMNIA_EXPLORER_URL}/address/${PERP_POOL_FACTORY_ADDRESS}`}
-          target="_blank"
-          rel="noreferrer"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-subtle hover:bg-surface-hover text-slate-300 text-xs font-medium border border-surface-border transition-colors"
+        <div
+          title={`Verified on Somnia Hideki v2: ${PERP_POOL_FACTORY_ADDRESS}`}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-subtle text-slate-300 text-xs font-medium border border-surface-border font-mono"
         >
-          <span>View Factory on Explorer</span>
-          <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-        </a>
+          <span>Factory: <span className="text-cyan-300">{PERP_POOL_FACTORY_ADDRESS.slice(0, 8)}...{PERP_POOL_FACTORY_ADDRESS.slice(-6)}</span></span>
+        </div>
       </div>
 
       {/* Markets Table */}

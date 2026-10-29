@@ -146,7 +146,7 @@ export const RiskCockpit: React.FC<RiskCockpitProps> = ({
             </div>
           </div>
           <div className="text-[11px] text-slate-400">
-            0% budget consumed today (Dry-Run active)
+            0% budget consumed today (Risk Budget Safe)
           </div>
         </div>
 

@@ -10,8 +10,11 @@ import {
   MARGIN_BANK_ADDRESS,
   ERC20_READ_ABI,
   MARGIN_BANK_READ_ABI,
+  MARGIN_BANK_POSITION_READ_ABI,
+  POOL_ORDERS_ABI,
+  DEFAULT_MARKETS,
 } from '../constants.js';
-import { WalletState, PositionRecord, OpenOrderRecord } from '../types.js';
+import { WalletState, PositionRecord, OpenOrderRecord, DataStatus } from '../types.js';
 
 export interface UseWalletReturn {
   wallet: WalletState;
@@ -121,6 +124,7 @@ export function useWallet(): UseWalletReturn {
       let imReqRaw: bigint | null = null;
       let marginStatusNum: number | null = null;
       let marginErrStr: string | undefined;
+      let activePools: `0x${string}`[] = [];
 
       try {
         const [state, health, status] = await Promise.all([
@@ -152,6 +156,7 @@ export function useWallet(): UseWalletReturn {
 
         unlockedRaw = typedState.unlockedCollateralBalance;
         lockedRaw = typedState.lockedCollateral;
+        activePools = typedState.activePerpPools || [];
 
         if (health) {
           const typedHealth = health as unknown as [bigint, bigint, bigint, bigint];
@@ -165,6 +170,126 @@ export function useWallet(): UseWalletReturn {
       } catch (mErr) {
         marginErrStr = (mErr as Error).message || 'MarginBank state read failed';
         console.warn('[useWallet] MarginBank account state query failed:', mErr);
+      }
+
+      // 4. Live Open Positions from MarginBank
+      let fetchedPositions: PositionRecord[] = [];
+      let positionsStatus: DataStatus = 'LOADING';
+      let positionsErr: string | undefined;
+
+      try {
+        if (activePools && activePools.length > 0) {
+          const posPromises = activePools.map(async (pool) => {
+            try {
+              const posData = (await publicClient.readContract({
+                address: MARGIN_BANK_ADDRESS,
+                abi: MARGIN_BANK_POSITION_READ_ABI,
+                functionName: 'getPosition',
+                args: [address, pool],
+              })) as unknown as { size: bigint; avgEntryPrice: bigint; entryFundingIndex: bigint; lastUpdatedTimestampNs: bigint };
+
+              if (posData && posData.size !== 0n) {
+                const marketMatch = DEFAULT_MARKETS.find((m) => m.poolAddress.toLowerCase() === pool.toLowerCase());
+                const baseSymbol = marketMatch?.baseSymbol || 'PERP';
+                const baseDecimals = marketMatch?.baseDecimals || 18;
+                const sizeAbs = posData.size < 0n ? -posData.size : posData.size;
+                const sizeHuman = Number(formatUnits(sizeAbs, baseDecimals));
+                const entryPriceHuman = Number(formatUnits(posData.avgEntryPrice, 18));
+                return {
+                  symbol: marketMatch?.display || `${baseSymbol}-PERP`,
+                  poolAddress: pool,
+                  side: posData.size > 0n ? ('long' as const) : ('short' as const),
+                  size: sizeHuman,
+                  entryPrice: entryPriceHuman,
+                  markPrice: entryPriceHuman,
+                  unrealizedPnl: 0,
+                  liquidationPrice: 0,
+                };
+              }
+              return null;
+            } catch {
+              return null;
+            }
+          });
+          const results = await Promise.all(posPromises);
+          fetchedPositions = results.filter((p): p is PositionRecord => p !== null);
+          positionsStatus = 'LIVE';
+        } else {
+          fetchedPositions = [];
+          positionsStatus = 'LIVE';
+        }
+      } catch (pErr) {
+        positionsStatus = 'ERROR';
+        positionsErr = (pErr as Error).message || 'Failed to query open positions';
+      }
+
+      // 5. Live Open Orders across verified CLOB pools
+      let fetchedOpenOrders: OpenOrderRecord[] = [];
+      let openOrdersStatus: DataStatus = 'LOADING';
+      let openOrdersErr: string | undefined;
+
+      try {
+        const orderPromises = DEFAULT_MARKETS.slice(0, 3).map(async (m) => {
+          try {
+            const orderIds = (await publicClient.readContract({
+              address: m.poolAddress,
+              abi: POOL_ORDERS_ABI,
+              functionName: 'getOwnOpenOrders',
+              account: address,
+            })) as bigint[];
+
+            if (!orderIds || orderIds.length === 0) return [];
+
+            const detailsPromises = orderIds.map(async (oid) => {
+              try {
+                const orderData = (await publicClient.readContract({
+                  address: m.poolAddress,
+                  abi: POOL_ORDERS_ABI,
+                  functionName: 'getOrder',
+                  args: [oid],
+                })) as {
+                  orderId: bigint;
+                  isBid: boolean;
+                  owner: `0x${string}`;
+                  userData: bigint;
+                  price: bigint;
+                  fullQuantity: bigint;
+                  quantityRemaining: bigint;
+                  expireTimestampNs: bigint;
+                };
+
+                const priceHuman = Number(formatUnits(orderData.price, 18));
+                const qtyHuman = Number(formatUnits(orderData.quantityRemaining, m.baseDecimals));
+                const filledHuman = Number(formatUnits(orderData.fullQuantity - orderData.quantityRemaining, m.baseDecimals));
+
+                return {
+                  id: oid.toString(),
+                  symbol: m.display || m.symbol,
+                  side: orderData.isBid ? ('buy' as const) : ('sell' as const),
+                  price: priceHuman,
+                  amount: qtyHuman,
+                  filled: filledHuman,
+                  status: 'RESTING',
+                  timestamp: Date.now(),
+                };
+              } catch {
+                return null;
+              }
+            });
+
+            const resolved = await Promise.all(detailsPromises);
+            return resolved.filter((o): o is OpenOrderRecord => o !== null);
+          } catch {
+            return [];
+          }
+        });
+
+        const orderResults = await Promise.all(orderPromises);
+        fetchedOpenOrders = orderResults.flat();
+        openOrdersStatus = 'LIVE';
+      } catch (oErr) {
+        openOrdersStatus = 'ERROR';
+        openOrdersErr = (oErr as Error).message || 'Failed to query open orders';
       }
 
       // Discard stale response if active account changed during async queries
@@ -193,6 +318,12 @@ export function useWallet(): UseWalletReturn {
         imReqRaw,
         marginStatus: marginStatusNum,
         marginStatusLabel: marginStatusNum !== null ? MARGIN_STATUS_LABELS[marginStatusNum] ?? 'Unknown' : null,
+        positions: fetchedPositions,
+        openOrders: fetchedOpenOrders,
+        positionsStatus,
+        openOrdersStatus,
+        positionsError: positionsErr,
+        openOrdersError: openOrdersErr,
         balanceStatus: hasReadError ? 'ERROR' : 'FETCHED',
         balanceError: hasReadError ? usdsoErr || marginErrStr || 'Some account balances could not be verified' : undefined,
         balanceSource: 'Somnia Hideki On-Chain (Viem + MarginBank)',
@@ -442,7 +573,7 @@ export function useWallet(): UseWalletReturn {
                 chainName: 'Somnia Hideki Testnet',
                 nativeCurrency: { name: 'STT', symbol: 'STT', decimals: 18 },
                 rpcUrls: [SOMNIA_RPC_URL],
-                blockExplorerUrls: [SOMNIA_EXPLORER_URL],
+                blockExplorerUrls: [],
               },
             ],
           });

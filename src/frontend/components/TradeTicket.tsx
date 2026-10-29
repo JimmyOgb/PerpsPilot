@@ -38,7 +38,7 @@ export const TradeTicket: React.FC<TradeTicketProps> = ({
   selectedPrice,
 }) => {
   const [side, setSide] = useState<OrderSide>('BUY_LONG');
-  const [orderType, setOrderType] = useState<OrderType>('LIMIT');
+  const [orderType, setOrderType] = useState<OrderType>('POST_ONLY');
   const [priceInput, setPriceInput] = useState<string>('0');
   const [amountInput, setAmountInput] = useState<string>('0');
   const [leverage, setLeverage] = useState<number>(DEFAULT_LEVERAGE);
@@ -111,10 +111,11 @@ export const TradeTicket: React.FC<TradeTicketProps> = ({
     ? Number(formatUnits(wallet.unlockedCollateralRaw, 18))
     : 0;
   const hasCollateral = unlockedCollateralUsd >= imf;
+  const isOrderTypeSupported = orderType === 'POST_ONLY' || orderType === 'LIMIT';
   const isLiveReady =
     executionMode === 'live'
-      ? isWalletConnected && isCorrectNetwork && hasGasBalance && hasCollateral && riskEval.isSafeToSimulate
-      : riskEval.isSafeToSimulate;
+      ? isWalletConnected && isCorrectNetwork && hasGasBalance && hasCollateral && riskEval.isSafeToSimulate && isOrderTypeSupported
+      : riskEval.isSafeToSimulate && isOrderTypeSupported;
 
   const handlePriceStep = (delta: number) => {
     const newPrice = Math.max(market.tickSize, parsedPrice + delta * market.tickSize);
@@ -195,27 +196,43 @@ export const TradeTicket: React.FC<TradeTicketProps> = ({
       </div>
 
       {/* Order Type Selector */}
-      <div className="flex items-center justify-between border-b border-surface-border pb-2">
-        <div className="flex items-center gap-2">
-          {(['LIMIT', 'MARKET'] as OrderType[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setOrderType(t)}
-              className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors ${
-                orderType === t
-                  ? 'bg-surface-subtle text-cyan-400 border border-surface-border'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {t === 'LIMIT' ? 'Limit Order' : 'Market Order'}
-            </button>
-          ))}
+      <div className="flex flex-col gap-1.5 border-b border-surface-border pb-2.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            {(['POST_ONLY', 'LIMIT', 'MARKET'] as OrderType[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => setOrderType(t)}
+                className={`px-2 py-1 rounded text-[11px] font-semibold transition-colors ${
+                  orderType === t
+                    ? 'bg-surface-subtle text-cyan-400 border border-surface-border'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {t === 'POST_ONLY' ? 'Post-Only (Maker)' : t === 'LIMIT' ? 'Limit' : 'Market'}
+              </button>
+            ))}
+          </div>
+
+          <div className="text-[10px] text-slate-400 flex items-center gap-1">
+            <span>Slippage:</span>
+            <span className="font-mono text-slate-300 font-semibold">{slippage}%</span>
+          </div>
         </div>
 
-        <div className="text-[10px] text-slate-400 flex items-center gap-1">
-          <span>Slippage:</span>
-          <span className="font-mono text-slate-300 font-semibold">{slippage}%</span>
-        </div>
+        {orderType === 'MARKET' ? (
+          <div className="p-2 rounded bg-amber-500/10 border border-amber-500/30 text-[10px] text-amber-300">
+            <strong>Market Orders Disabled on Testnet:</strong> Blocked to prevent execution slippage against thin CLOB books. Please choose <strong>Post-Only</strong> or <strong>Limit</strong>.
+          </div>
+        ) : orderType === 'POST_ONLY' ? (
+          <div className="text-[10px] text-emerald-400/90 pl-1 font-mono">
+            ✓ Maker execution guaranteed: Reverts if order would match immediately as a taker.
+          </div>
+        ) : (
+          <div className="text-[10px] text-slate-400 pl-1 font-mono">
+            ℹ Standard limit order: Rests if passive, fills as taker if crossing the spread.
+          </div>
+        )}
       </div>
 
       {/* Collateral Breakdown Banner (Truthful on-chain query) */}
@@ -256,7 +273,7 @@ export const TradeTicket: React.FC<TradeTicketProps> = ({
       </div>
 
       {/* Price Input (Tick Quantized) */}
-      {orderType === 'LIMIT' && (
+      {(orderType === 'LIMIT' || orderType === 'POST_ONLY') && (
         <div className="flex flex-col gap-1">
           <div className="flex items-center justify-between text-[11px] text-slate-400">
             <span>Limit Price</span>
@@ -450,10 +467,14 @@ export const TradeTicket: React.FC<TradeTicketProps> = ({
           </span>
         </div>
         <p className="text-slate-400 pl-5">
-          • <strong className="text-slate-300">POST_ONLY</strong> guarantees maker execution upon acceptance, but resting orders remain subject to subsequent market fill risk until cancelled.
+          • {orderType === 'POST_ONLY' ? (
+            <><strong className="text-emerald-300">POST_ONLY:</strong> Guarantees maker execution upon acceptance; will revert if order would immediately cross the book. Resting orders remain subject to subsequent market fill risk until cancelled.</>
+          ) : (
+            <><strong className="text-cyan-300">LIMIT:</strong> Standard limit order. Rests in book if passive, or executes immediately as a taker if crossing the spread.</>
+          )}
         </p>
         <p className="text-slate-400 pl-5">
-          • <strong className="text-slate-300">Cancellation</strong> stops resting orders, but does not close or reverse a position if the order has already matched.
+          • <strong className="text-slate-300">Cancellation:</strong> Stops resting orders and releases locked margin, but does not close or reverse a position if the order has already matched.
         </p>
       </div>
 
@@ -473,7 +494,14 @@ export const TradeTicket: React.FC<TradeTicketProps> = ({
       </div>
 
       {/* Primary Action Button */}
-      {executionMode === 'live' ? (
+      {orderType === 'MARKET' ? (
+        <button
+          disabled
+          className="w-full py-2.5 rounded-lg font-bold text-xs bg-surface-subtle text-amber-400/60 border border-surface-border cursor-not-allowed"
+        >
+          <span>Market Orders Disabled on Testnet (Select Post-Only or Limit)</span>
+        </button>
+      ) : executionMode === 'live' ? (
         <button
           onClick={() => onSimulateOrder(proposal, true)}
           disabled={!isLiveReady}

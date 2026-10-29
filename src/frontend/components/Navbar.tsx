@@ -160,16 +160,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span title="MarginBank Unlocked Collateral" className="text-emerald-400">Margin: {wallet.marginBankBalance ? `$${wallet.marginBankBalance}` : '$0.00'}</span>
               </div>
             </div>
-            <a
-              href={`${SOMNIA_EXPLORER_URL}/address/${wallet.address}`}
-              target="_blank"
-              rel="noreferrer"
-              title={`Allowance to MarginBank: $${wallet.usdsoAllowance ?? '0.00'} USDso`}
-              className="flex items-center gap-1.5 bg-surface-subtle hover:bg-surface-hover text-white px-2.5 py-1 rounded text-xs font-mono font-medium border border-surface-border transition-colors"
+            <div
+              title={`Connected Account: ${wallet.address}\nMarginBank Allowance: $${wallet.usdsoAllowance ?? '0.00'} USDso`}
+              className="flex items-center gap-1.5 bg-surface-subtle text-white px-2.5 py-1 rounded text-xs font-mono font-medium border border-surface-border cursor-default"
             >
               <span>{wallet.address.slice(0, 6)}...{wallet.address.slice(-4)}</span>
-              <ExternalLink className="w-3 h-3 text-slate-400" />
-            </a>
+            </div>
             <button
               onClick={onDisconnect}
               title="Disconnect"

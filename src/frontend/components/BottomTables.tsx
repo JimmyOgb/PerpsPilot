@@ -92,7 +92,7 @@ export const BottomTables: React.FC<BottomTablesProps> = ({
           <div>
             {recentSimulations.length === 0 ? (
               <div className="p-8 text-center text-slate-500 font-mono text-xs">
-                No orders simulated yet. Configure the Trade Ticket above and click "Preview Order (Read-Only Simulation)" to generate a pre-trade audit record.
+                No orders simulated yet. Configure the Trade Ticket above and click "Preview Order" or "Review & Authorize" to generate a pre-trade audit record.
               </div>
             ) : (
               <table className="w-full text-left font-mono text-xs">
@@ -134,7 +134,7 @@ export const BottomTables: React.FC<BottomTablesProps> = ({
                       <td className="px-4 py-2 text-center">
                         <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
                           <CheckCircle2 className="w-3 h-3" />
-                          <span>PASS (Dry-Run)</span>
+                          <span>PASS (Pre-Trade Gate)</span>
                         </span>
                       </td>
                       <td className="px-4 py-2 text-center">
@@ -294,18 +294,118 @@ export const BottomTables: React.FC<BottomTablesProps> = ({
         )}
 
         {activeTab === 'orders' && (
-          <div className="p-8 text-center text-slate-500 font-mono text-xs">
-            {wallet?.isConnected
-              ? 'Zero resting orders on Somnia Hideki v2. Submit and authorize an order above to place it in the CLOB.'
-              : 'Zero active resting orders on dreamDEX Hideki v2. Connect wallet to view your resting orders.'}
+          <div>
+            {!wallet?.isConnected ? (
+              <div className="p-8 text-center text-slate-500 font-mono text-xs">
+                Connect wallet on Somnia Hideki v2 to view your resting orders.
+              </div>
+            ) : wallet.openOrdersStatus === 'LOADING' ? (
+              <div className="p-8 text-center text-cyan-400 font-mono text-xs animate-pulse">
+                Querying on-chain resting orders across Somnia Hideki CLOB pools...
+              </div>
+            ) : wallet.openOrdersStatus === 'ERROR' ? (
+              <div className="p-8 text-center text-rose-400 font-mono text-xs">
+                Failed to query open orders: {wallet.openOrdersError || 'RPC error'}
+              </div>
+            ) : !wallet.openOrders || wallet.openOrders.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 font-mono text-xs">
+                Zero resting orders detected on Somnia Hideki v2 CLOB pools for connected account.
+              </div>
+            ) : (
+              <table className="w-full text-left font-mono text-xs">
+                <thead className="bg-[#0b0e14] text-[10px] text-slate-500 uppercase border-b border-surface-border">
+                  <tr>
+                    <th className="px-4 py-2">Order ID</th>
+                    <th className="px-4 py-2">Market</th>
+                    <th className="px-4 py-2">Side</th>
+                    <th className="px-4 py-2 text-right">Limit Price</th>
+                    <th className="px-4 py-2 text-right">Remaining Qty</th>
+                    <th className="px-4 py-2 text-right">Filled</th>
+                    <th className="px-4 py-2 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-surface-border/50">
+                  {wallet.openOrders.map((o) => (
+                    <tr key={o.id} className="hover:bg-surface-subtle transition-colors">
+                      <td className="px-4 py-2 font-bold text-cyan-300">{o.id}</td>
+                      <td className="px-4 py-2 font-bold text-white">{o.symbol}</td>
+                      <td className="px-4 py-2">
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                            o.side === 'buy' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                          }`}
+                        >
+                          {o.side.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-right text-slate-200">${o.price.toFixed(2)}</td>
+                      <td className="px-4 py-2 text-right text-slate-200 font-bold">{o.amount}</td>
+                      <td className="px-4 py-2 text-right text-slate-400">{o.filled}</td>
+                      <td className="px-4 py-2 text-center">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+                          {o.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         )}
 
         {activeTab === 'positions' && (
-          <div className="p-8 text-center text-slate-500 font-mono text-xs">
-            {wallet?.isConnected
-              ? 'Zero active open positions detected in MarginBank (0x478769E1...). Account margin remains safely isolated.'
-              : 'Connect wallet to inspect account positions in MarginBank.'}
+          <div>
+            {!wallet?.isConnected ? (
+              <div className="p-8 text-center text-slate-500 font-mono text-xs">
+                Connect wallet on Somnia Hideki v2 to inspect MarginBank positions.
+              </div>
+            ) : wallet.positionsStatus === 'LOADING' ? (
+              <div className="p-8 text-center text-cyan-400 font-mono text-xs animate-pulse">
+                Querying on-chain perpetual positions in MarginBank (0x478769E1...)...
+              </div>
+            ) : wallet.positionsStatus === 'ERROR' ? (
+              <div className="p-8 text-center text-rose-400 font-mono text-xs">
+                Failed to query MarginBank positions: {wallet.positionsError || 'RPC error'}
+              </div>
+            ) : !wallet.positions || wallet.positions.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 font-mono text-xs">
+                Zero active open positions detected in MarginBank (0x478769E1...). Account margin remains safely unencumbered.
+              </div>
+            ) : (
+              <table className="w-full text-left font-mono text-xs">
+                <thead className="bg-[#0b0e14] text-[10px] text-slate-500 uppercase border-b border-surface-border">
+                  <tr>
+                    <th className="px-4 py-2">Market</th>
+                    <th className="px-4 py-2">Side</th>
+                    <th className="px-4 py-2 text-right">Position Size</th>
+                    <th className="px-4 py-2 text-right">Avg Entry Price</th>
+                    <th className="px-4 py-2">Pool Contract</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-surface-border/50">
+                  {wallet.positions.map((p, idx) => (
+                    <tr key={idx} className="hover:bg-surface-subtle transition-colors">
+                      <td className="px-4 py-2 font-bold text-white">{p.symbol}</td>
+                      <td className="px-4 py-2">
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            p.side === 'long' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                          }`}
+                        >
+                          {p.side}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-right text-slate-200 font-bold">{p.size}</td>
+                      <td className="px-4 py-2 text-right text-cyan-300 font-bold">${p.entryPrice.toFixed(2)}</td>
+                      <td className="px-4 py-2 text-slate-500 font-mono text-[10px] truncate max-w-[120px]">
+                        {p.poolAddress}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         )}
       </div>

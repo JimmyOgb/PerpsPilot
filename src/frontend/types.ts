@@ -2,7 +2,7 @@ import type { LiveExecutionState } from '../execution/types.js';
 export type { LiveExecutionState };
 
 export type OrderSide = 'BUY_LONG' | 'SELL_SHORT';
-export type OrderType = 'LIMIT' | 'MARKET';
+export type OrderType = 'LIMIT' | 'POST_ONLY' | 'MARKET';
 export type OrderStatus = 'SIMULATED_PREFLIGHT_PASS' | 'RESTED' | 'FILLED' | 'BLOCKED' | 'CANCELLED';
 
 export type DataStatus = 'LIVE' | 'STALE' | 'LOADING' | 'UNAVAILABLE' | 'BLOCKED' | 'UNKNOWN' | 'SIMULATED' | 'ERROR';
@@ -194,6 +194,10 @@ export interface WalletState {
   marginStatusLabel?: string | null;
   positions?: PositionRecord[];
   openOrders?: OpenOrderRecord[];
+  positionsStatus?: DataStatus;
+  openOrdersStatus?: DataStatus;
+  positionsError?: string;
+  openOrdersError?: string;
   balanceStatus: BalanceStatus;
   balanceSource?: string;
   lastUpdated?: number;
