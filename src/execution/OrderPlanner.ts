@@ -96,6 +96,13 @@ export class OrderPlanner {
     const errors: string[] = [];
     const warnings: string[] = [];
 
+    // 0. Strict side validation (eliminate silent short hazard)
+    if (params.side !== "BUY_LONG" && params.side !== "SELL_SHORT") {
+      errors.push(
+        `Invalid or unsupported order side '${params.side}'. Side must strictly be 'BUY_LONG' or 'SELL_SHORT'.`,
+      );
+    }
+
     // 1. Chain validation
     if (chainId !== EXPECTED_HIDEKI_CHAIN_ID) {
       errors.push(`Chain ID mismatch: expected ${EXPECTED_HIDEKI_CHAIN_ID}, got ${chainId}`);

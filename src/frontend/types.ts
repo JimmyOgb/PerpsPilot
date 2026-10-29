@@ -1,3 +1,6 @@
+import type { LiveExecutionState } from '../execution/types.js';
+export type { LiveExecutionState };
+
 export type OrderSide = 'BUY_LONG' | 'SELL_SHORT';
 export type OrderType = 'LIMIT' | 'MARKET';
 export type OrderStatus = 'SIMULATED_PREFLIGHT_PASS' | 'RESTED' | 'FILLED' | 'BLOCKED' | 'CANCELLED';
@@ -180,6 +183,8 @@ export interface WalletState {
   sttRaw: bigint | null;
   usdsoWalletBalance: string | null;
   usdsoRaw: bigint | null;
+  usdsoAllowance?: string | null;
+  usdsoAllowanceRaw?: bigint | null;
   marginBankBalance: string | null;
   unlockedCollateralRaw: bigint | null;
   lockedCollateralRaw?: bigint | null;

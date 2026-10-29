@@ -7,6 +7,7 @@ import {
   type WalletClient,
   type PublicClient,
 } from "viem";
+import { decodePlaceOrder, type DecodedPlacement } from "@somnia-chain/markets-sdk";
 import { EXPECTED_HIDEKI_CHAIN_ID } from "../config/constants.js";
 import { ExecutionGuard } from "./ExecutionGuard.js";
 import { OrderPlanner } from "./OrderPlanner.js";
@@ -16,6 +17,8 @@ import type {
   OrderExecutionType,
   TransactionReceiptRecord,
   ReconciliationRecord,
+  OnchainOrderDetails,
+  OnchainPositionDetails,
 } from "./types.js";
 import { ReceiptVerifier } from "./ReceiptVerifier.js";
 import { OrderReconciler, type ExchangeOrderSnapshot } from "./OrderReconciler.js";
@@ -30,6 +33,14 @@ export const PERP_POOL_PLACE_ORDER_ABI = parseAbi([
   "function cancelOrder(uint128 orderId)",
   "function updateFunding()",
   "function marginBank() view returns (address)",
+]);
+
+export const POOL_ORDER_READ_ABI = parseAbi([
+  "function getOrder(uint128 orderId) view returns ((uint128 orderId, bool isBid, address owner, uint64 userData, uint256 price, uint256 fullQuantity, uint256 quantityRemaining, uint64 expireTimestampNs))",
+]);
+
+export const MARGIN_BANK_POSITION_READ_ABI = parseAbi([
+  "function getPosition(address account, address perpPool) view returns ((int128 size, uint128 avgEntryPrice, int256 entryFundingIndex, uint64 lastUpdatedTimestampNs))",
 ]);
 
 /**
@@ -175,7 +186,17 @@ export class LiveOrderAdapter {
       throw new Error("[LiveOrderAdapter] Price and quantity must be strictly greater than 0");
     }
 
-    const isBid = plan.side === "BUY_LONG";
+    // Strict side-encoding validation: reject all unsupported or lowercase variants
+    let isBid: boolean;
+    if (plan.side === "BUY_LONG") {
+      isBid = true;
+    } else if (plan.side === "SELL_SHORT") {
+      isBid = false;
+    } else {
+      throw new Error(
+        `[LiveOrderAdapter] Invalid or unsupported order side: '${plan.side}'. Side must strictly be 'BUY_LONG' or 'SELL_SHORT'.`,
+      );
+    }
     const userData = 0n; // uint64: default MM bookkeeping
     const price = plan.priceRaw; // uint256: 18 decimals USDso quote
     const quantity = plan.quantityRaw; // uint256: base decimals
@@ -271,8 +292,8 @@ export class LiveOrderAdapter {
     // 1. Strict guard evaluation
     this.assertLiveExecutionAllowed(plan, connectedWallet, isUserApproved, approvedDigest);
 
-    // 2. In Stage F.3, DRY_RUN=true is enforced. If ever called directly:
-    if (this.guard.isDryRun() || process.env.DRY_RUN !== "false") {
+    // 2. Strict guard check: fail closed if dry-run guard is active
+    if (this.guard.isDryRun()) {
       throw new Error("[LiveOrderAdapter] Live transaction broadcast is blocked by DRY_RUN=true.");
     }
 
@@ -316,5 +337,71 @@ export class LiveOrderAdapter {
 
   public getGuard(): ExecutionGuard {
     return this.guard;
+  }
+
+  /**
+   * Decodes order placement receipt logs using the official SDK decodePlaceOrder.
+   * Extracts resting orderId and all OrderFilled logs.
+   */
+  public static decodePlacementReceipt(receipt: any, poolAddress?: Address): DecodedPlacement {
+    return decodePlaceOrder(receipt, poolAddress);
+  }
+
+  /**
+   * Authoritatively queries the active order record from the live CLOB pool contract.
+   * Returns null if the order does not exist, has been filled, or was cancelled.
+   */
+  public static async getOrderOnchain(
+    poolAddress: Address,
+    orderId: bigint,
+    client: PublicClient,
+  ): Promise<OnchainOrderDetails | null> {
+    try {
+      const order = await client.readContract({
+        address: poolAddress,
+        abi: POOL_ORDER_READ_ABI,
+        functionName: "getOrder",
+        args: [orderId],
+      });
+      return {
+        orderId: order.orderId,
+        isBid: order.isBid,
+        owner: order.owner,
+        userData: order.userData,
+        price: order.price,
+        fullQuantity: order.fullQuantity,
+        quantityRemaining: order.quantityRemaining,
+        expireTimestampNs: order.expireTimestampNs,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Authoritatively queries an account's perpetual position directly from MarginBank.
+   */
+  public static async getPositionOnchain(
+    marginBankAddress: Address,
+    account: Address,
+    poolAddress: Address,
+    client: PublicClient,
+  ): Promise<OnchainPositionDetails | null> {
+    try {
+      const pos = await client.readContract({
+        address: marginBankAddress,
+        abi: MARGIN_BANK_POSITION_READ_ABI,
+        functionName: "getPosition",
+        args: [account, poolAddress],
+      });
+      return {
+        size: BigInt(pos.size),
+        avgEntryPrice: BigInt(pos.avgEntryPrice),
+        entryFundingIndex: BigInt(pos.entryFundingIndex),
+        lastUpdatedTimestampNs: BigInt(pos.lastUpdatedTimestampNs),
+      };
+    } catch {
+      return null;
+    }
   }
 }

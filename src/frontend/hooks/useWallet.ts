@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { createPublicClient, http, formatUnits } from 'viem';
+import { createPublicClient, createWalletClient, custom, http, formatUnits, type WalletClient } from 'viem';
+import { hidekiTestnet } from '@somnia-chain/markets-sdk/chains';
 import {
   SOMNIA_HIDEKI_CHAIN_ID,
   SOMNIA_HIDEKI_CHAIN_HEX,
@@ -11,6 +12,14 @@ import {
   MARGIN_BANK_READ_ABI,
 } from '../constants.js';
 import { WalletState, PositionRecord, OpenOrderRecord } from '../types.js';
+
+export interface UseWalletReturn {
+  wallet: WalletState;
+  connect: () => Promise<void>;
+  disconnect: () => void;
+  switchToHideki: () => Promise<void>;
+  getWalletClient: () => WalletClient | null;
+}
 
 interface EthereumProvider {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
@@ -31,7 +40,7 @@ const MARGIN_STATUS_LABELS: Record<number, string> = {
   3: 'CloseOut',
 };
 
-export function useWallet() {
+export function useWallet(): UseWalletReturn {
   const [wallet, setWallet] = useState<WalletState>({
     address: null,
     chainId: null,
@@ -42,6 +51,8 @@ export function useWallet() {
     sttRaw: null,
     usdsoWalletBalance: null,
     usdsoRaw: null,
+    usdsoAllowance: null,
+    usdsoAllowanceRaw: null,
     marginBankBalance: null,
     unlockedCollateralRaw: null,
     lockedCollateralRaw: null,
@@ -77,18 +88,29 @@ export function useWallet() {
       // 1. Live Native STT Gas Balance (18 decimals)
       const sttRaw = await publicClient.getBalance({ address });
 
-      // 2. Live USDso Token Balance (18 decimals)
+      // 2. Live USDso Token Balance & MarginBank Allowance (18 decimals)
       let usdsoRaw: bigint | null = null;
+      let allowanceRaw: bigint | null = null;
       let usdsoErr: string | undefined;
       try {
-        usdsoRaw = await publicClient.readContract({
-          address: USDSO_TOKEN_ADDRESS,
-          abi: ERC20_READ_ABI,
-          functionName: 'balanceOf',
-          args: [address],
-        });
+        const [tokenBal, tokenAllowance] = await Promise.all([
+          publicClient.readContract({
+            address: USDSO_TOKEN_ADDRESS,
+            abi: ERC20_READ_ABI,
+            functionName: 'balanceOf',
+            args: [address],
+          }),
+          publicClient.readContract({
+            address: USDSO_TOKEN_ADDRESS,
+            abi: ERC20_READ_ABI,
+            functionName: 'allowance',
+            args: [address, MARGIN_BANK_ADDRESS],
+          }),
+        ]);
+        usdsoRaw = tokenBal;
+        allowanceRaw = tokenAllowance;
       } catch (tokenErr) {
-        usdsoErr = (tokenErr as Error).message || 'Failed to read USDso balance';
+        usdsoErr = (tokenErr as Error).message || 'Failed to read USDso balance or allowance';
         console.warn('[useWallet] USDso balance query failed:', tokenErr);
       }
 
@@ -151,6 +173,7 @@ export function useWallet() {
       const sttFormatted = Number(formatUnits(sttRaw, 18)).toFixed(4);
       // NEVER treat read error as zero: format only if raw value was actually read
       const usdsoFormatted = usdsoRaw !== null ? Number(formatUnits(usdsoRaw, 18)).toFixed(2) : null;
+      const allowanceFormatted = allowanceRaw !== null ? Number(formatUnits(allowanceRaw, 18)).toFixed(2) : null;
       const marginFormatted = unlockedRaw !== null ? Number(formatUnits(unlockedRaw, 18)).toFixed(2) : null;
 
       const hasReadError = usdsoRaw === null || unlockedRaw === null;
@@ -161,6 +184,8 @@ export function useWallet() {
         sttRaw,
         usdsoWalletBalance: usdsoFormatted,
         usdsoRaw,
+        usdsoAllowance: allowanceFormatted,
+        usdsoAllowanceRaw: allowanceRaw,
         marginBankBalance: marginFormatted,
         unlockedCollateralRaw: unlockedRaw,
         lockedCollateralRaw: lockedRaw,
@@ -226,6 +251,8 @@ export function useWallet() {
             sttRaw: null,
             usdsoWalletBalance: null,
             usdsoRaw: null,
+            usdsoAllowance: null,
+            usdsoAllowanceRaw: null,
             marginBankBalance: null,
             unlockedCollateralRaw: null,
             balanceStatus: 'IDLE',
@@ -255,6 +282,8 @@ export function useWallet() {
             sttRaw: null,
             usdsoWalletBalance: null,
             usdsoRaw: null,
+            usdsoAllowance: null,
+            usdsoAllowanceRaw: null,
             marginBankBalance: null,
             unlockedCollateralRaw: null,
             lockedCollateralRaw: null,
@@ -280,6 +309,8 @@ export function useWallet() {
             sttRaw: null,
             usdsoWalletBalance: null,
             usdsoRaw: null,
+            usdsoAllowance: null,
+            usdsoAllowanceRaw: null,
             marginBankBalance: null,
             unlockedCollateralRaw: null,
             balanceStatus: 'LOADING',
@@ -375,6 +406,8 @@ export function useWallet() {
       sttRaw: null,
       usdsoWalletBalance: null,
       usdsoRaw: null,
+      usdsoAllowance: null,
+      usdsoAllowanceRaw: null,
       marginBankBalance: null,
       unlockedCollateralRaw: null,
       lockedCollateralRaw: null,
@@ -420,10 +453,22 @@ export function useWallet() {
     }
   };
 
+  const getWalletClient = useCallback((): WalletClient | null => {
+    if (typeof window === 'undefined' || !window.ethereum || !wallet.address) {
+      return null;
+    }
+    return createWalletClient({
+      account: wallet.address,
+      chain: hidekiTestnet,
+      transport: custom(window.ethereum),
+    }) as WalletClient;
+  }, [wallet.address]);
+
   return {
     wallet,
     connect,
     disconnect,
     switchToHideki,
+    getWalletClient,
   };
 }

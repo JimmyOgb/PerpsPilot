@@ -3,6 +3,46 @@ import type { Address } from "viem";
 export type OrderSide = "BUY_LONG" | "SELL_SHORT";
 export type OrderExecutionType = "LIMIT" | "MARKET" | "POST_ONLY" | "FILL_OR_KILL";
 
+/**
+ * 17-State Finite State Machine for Live Execution and Preflight Safety
+ */
+export type LiveExecutionState =
+  | "READ_ONLY"
+  | "WALLET_DISCONNECTED"
+  | "WRONG_NETWORK"
+  | "INSUFFICIENT_GAS"
+  | "INSUFFICIENT_COLLATERAL"
+  | "RISK_CHECK_FAILED"
+  | "AWAITING_USER_CONFIRMATION"
+  | "AWAITING_WALLET_SIGNATURE"
+  | "TRANSACTION_PENDING"
+  | "TRANSACTION_MINED"
+  | "ORDER_RESTING"
+  | "ORDER_PARTIALLY_FILLED"
+  | "ORDER_FILLED"
+  | "ORDER_CANCELLED"
+  | "POSITION_VERIFIED"
+  | "TRANSACTION_FAILED"
+  | "VERIFICATION_FAILED";
+
+export interface OnchainOrderDetails {
+  orderId: bigint;
+  isBid: boolean;
+  owner: Address;
+  userData: bigint;
+  price: bigint;
+  fullQuantity: bigint;
+  quantityRemaining: bigint;
+  expireTimestampNs: bigint;
+}
+
+export interface OnchainPositionDetails {
+  size: bigint;
+  avgEntryPrice: bigint;
+  entryFundingIndex: bigint;
+  lastUpdatedTimestampNs: bigint;
+}
+
 export type LifecycleState =
   | "PLANNED"
   | "VALIDATED"

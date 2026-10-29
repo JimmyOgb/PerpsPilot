@@ -8,7 +8,8 @@ import {
   Layers,
   Activity,
   BarChart2,
-  Terminal
+  Terminal,
+  Radio
 } from 'lucide-react';
 import { WalletState } from '../types.js';
 import { SOMNIA_HIDEKI_CHAIN_ID, SOMNIA_EXPLORER_URL } from '../constants.js';
@@ -113,11 +114,23 @@ export const Navbar: React.FC<NavbarProps> = ({
           </span>
         </div>
 
-        {/* Strict Dry Run Guard Badge */}
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/30 text-[11px] font-semibold text-amber-300">
-          <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-          <span>DRY_RUN: ACTIVE</span>
-        </div>
+        {/* Dynamic Execution & Network Status Badge */}
+        {wallet.isConnected && wallet.isCorrectNetwork ? (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-semibold text-emerald-300 shadow-[0_0_10px_rgba(0,229,153,0.15)]">
+            <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+            <span>TESTNET TRADING: READY</span>
+          </div>
+        ) : isWrongChain ? (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-rose-500/15 border border-rose-500/30 text-[11px] font-semibold text-rose-300">
+            <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+            <span>WRONG NETWORK</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-cyan-500/10 border border-cyan-500/30 text-[11px] font-semibold text-cyan-300">
+            <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+            <span>TESTNET PREVIEW</span>
+          </div>
+        )}
 
         {/* Network Badge */}
         {isWrongChain ? (
@@ -139,14 +152,19 @@ export const Navbar: React.FC<NavbarProps> = ({
         {wallet.isConnected && wallet.address ? (
           <div className="flex items-center gap-2 bg-[#0b0e14] border border-surface-border rounded-lg p-1">
             <div className="px-2 py-0.5 text-right hidden sm:block">
-              <div className="text-[10px] text-slate-400 font-mono">
-                {wallet.sttBalance ? `${wallet.sttBalance} STT` : 'Syncing STT...'}
+              <div className="text-[10px] text-slate-300 font-mono font-medium flex items-center gap-2">
+                <span title="Native STT Gas Balance">{wallet.sttBalance ? `${wallet.sttBalance} STT` : '0.0000 STT'}</span>
+                <span className="text-slate-600">|</span>
+                <span title="USDso Wallet Balance" className="text-cyan-400">{wallet.usdsoWalletBalance ? `$${wallet.usdsoWalletBalance}` : '$0.00'} USDso</span>
+                <span className="text-slate-600">|</span>
+                <span title="MarginBank Unlocked Collateral" className="text-emerald-400">Margin: {wallet.marginBankBalance ? `$${wallet.marginBankBalance}` : '$0.00'}</span>
               </div>
             </div>
             <a
               href={`${SOMNIA_EXPLORER_URL}/address/${wallet.address}`}
               target="_blank"
               rel="noreferrer"
+              title={`Allowance to MarginBank: $${wallet.usdsoAllowance ?? '0.00'} USDso`}
               className="flex items-center gap-1.5 bg-surface-subtle hover:bg-surface-hover text-white px-2.5 py-1 rounded text-xs font-mono font-medium border border-surface-border transition-colors"
             >
               <span>{wallet.address.slice(0, 6)}...{wallet.address.slice(-4)}</span>

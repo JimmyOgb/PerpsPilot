@@ -241,7 +241,7 @@ export function evaluateOrderRisk(
 
   // Determine banner title, subtitle, and severity
   let statusBannerTitle = 'All Pre-Trade Checks Passing';
-  let statusBannerSubtitle = 'Real-time risk engine enforcing hard caps on Somnia Hideki (50383) • Strict Dry-Run Active';
+  let statusBannerSubtitle = 'Real-time risk engine enforcing hard caps on Somnia Hideki (50383) • Live Testnet Ready';
   let statusBannerType: 'PASS' | 'WARN' | 'BLOCKED' | 'DISCONNECTED' | 'LOADING' = 'PASS';
 
   const criticalFails = checks.filter(c => !c.passed && c.severity === 'CRITICAL');
@@ -265,7 +265,7 @@ export function evaluateOrderRisk(
     statusBannerType = 'BLOCKED';
   } else {
     statusBannerTitle = 'All Pre-Trade Checks Passing';
-    statusBannerSubtitle = 'Account collateral and market parameters verified on Somnia Hideki • Strict Dry-Run Active';
+    statusBannerSubtitle = 'Account collateral and market parameters verified on Somnia Hideki v2 • Live Testnet Ready';
     statusBannerType = 'PASS';
   }
 

@@ -23,7 +23,7 @@ export const DiagnosticsView: React.FC<DiagnosticsViewProps> = ({
     {
       name: '1. Environment Configuration & Policy',
       status: 'PASS',
-      details: 'Node ES2022, Viem v2.21.0, Markets SDK v0.32.1. Strict DRY_RUN=true enforced in memory.',
+      details: 'Node ES2022, Viem v2.21.0, Markets SDK v0.32.1. Live Testnet Execution: Gated by explicit operator wallet authorization.',
     },
     {
       name: '2. Somnia Hideki Network Connection',

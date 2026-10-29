@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatUnits } from 'viem';
 import {
   ShieldCheck,
   AlertCircle,
@@ -6,6 +7,8 @@ import {
   HelpCircle,
   ArrowRight,
   Info,
+  Radio,
+  Lock,
 } from 'lucide-react';
 import { MarketInfo, OrderSide, OrderType, OrderProposal, WalletState } from '../types.js';
 import {
@@ -24,7 +27,7 @@ import { MAX_SINGLE_ORDER_NOTIONAL_USD, MAX_LEVERAGE, DEFAULT_LEVERAGE } from '.
 interface TradeTicketProps {
   market: MarketInfo;
   wallet: WalletState;
-  onSimulateOrder: (proposal: OrderProposal) => void;
+  onSimulateOrder: (proposal: OrderProposal, isLiveMode?: boolean) => void;
   selectedPrice?: number;
 }
 
@@ -40,6 +43,14 @@ export const TradeTicket: React.FC<TradeTicketProps> = ({
   const [amountInput, setAmountInput] = useState<string>('0');
   const [leverage, setLeverage] = useState<number>(DEFAULT_LEVERAGE);
   const [slippage, setSlippage] = useState<number>(0.5);
+  const [executionMode, setExecutionMode] = useState<'preview' | 'live'>('preview');
+
+  // Automatically select live testnet execution when wallet connects on Somnia Hideki v2
+  useEffect(() => {
+    if (wallet.isConnected && wallet.isCorrectNetwork) {
+      setExecutionMode('live');
+    }
+  }, [wallet.isConnected, wallet.isCorrectNetwork]);
 
   // Sync price if live mark arrives and input is still zero
   useEffect(() => {
@@ -92,6 +103,19 @@ export const TradeTicket: React.FC<TradeTicketProps> = ({
 
   const riskEval = evaluateOrderRisk(proposal, wallet, market.minOrderQty, market.isPriceable);
 
+  // Live execution readiness checks
+  const isWalletConnected = wallet.isConnected && !!wallet.address;
+  const isCorrectNetwork = wallet.isCorrectNetwork;
+  const hasGasBalance = (wallet.sttRaw ?? 0n) >= 50_000_000_000_000_000n; // >= 0.05 STT minimum
+  const unlockedCollateralUsd = wallet.unlockedCollateralRaw
+    ? Number(formatUnits(wallet.unlockedCollateralRaw, 18))
+    : 0;
+  const hasCollateral = unlockedCollateralUsd >= imf;
+  const isLiveReady =
+    executionMode === 'live'
+      ? isWalletConnected && isCorrectNetwork && hasGasBalance && hasCollateral && riskEval.isSafeToSimulate
+      : riskEval.isSafeToSimulate;
+
   const handlePriceStep = (delta: number) => {
     const newPrice = Math.max(market.tickSize, parsedPrice + delta * market.tickSize);
     const quantized = quantizePriceToTick(newPrice, market.tickSize, side === 'SELL_SHORT');
@@ -118,6 +142,34 @@ export const TradeTicket: React.FC<TradeTicketProps> = ({
 
   return (
     <div className="bg-surface rounded-lg border border-surface-border p-3.5 flex flex-col gap-3 text-xs">
+      {/* Execution Mode Selector (Preview vs Live) */}
+      <div className="grid grid-cols-2 p-1 bg-[#0b0e14] rounded-lg border border-surface-border text-xs font-semibold">
+        <button
+          type="button"
+          onClick={() => setExecutionMode('preview')}
+          className={`py-1.5 rounded-md flex items-center justify-center gap-1.5 transition-all ${
+            executionMode === 'preview'
+              ? 'bg-surface-subtle text-cyan-400 border border-cyan-500/30 shadow-sm'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Info className="w-3.5 h-3.5" />
+          <span>Preview Mode</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setExecutionMode('live')}
+          className={`py-1.5 rounded-md flex items-center justify-center gap-1.5 transition-all ${
+            executionMode === 'live'
+              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+          <span>Live Mode (Wallet)</span>
+        </button>
+      </div>
+
       {/* Side Toggle: Long vs Short */}
       <div className="grid grid-cols-2 gap-2 bg-[#0b0e14] p-1 rounded-lg border border-surface-border">
         <button
@@ -354,40 +406,105 @@ export const TradeTicket: React.FC<TradeTicketProps> = ({
         </div>
       )}
 
+      {/* Live Mode Explicit Alert Banner */}
+      {executionMode === 'live' && (
+        <div className="p-2.5 rounded-lg bg-amber-500/15 border border-amber-500/30 flex flex-col gap-1.5 text-amber-200 text-[11px]">
+          <div className="flex items-center gap-1.5 font-bold">
+            <Radio className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+            <span>LIVE TESTNET TRADING MODE (Chain ID 50383)</span>
+          </div>
+          {!isWalletConnected && (
+            <p className="text-amber-300/80 text-[10px]">
+              ⚠️ Wallet not connected. Please connect a Web3 wallet configured for Somnia Hideki.
+            </p>
+          )}
+          {isWalletConnected && !isCorrectNetwork && (
+            <p className="text-rose-300 text-[10px]">
+              ⚠️ Wrong network (Chain ID {wallet.chainId}). Please switch your wallet to Somnia Hideki (50383).
+            </p>
+          )}
+          {isWalletConnected && isCorrectNetwork && !hasGasBalance && (
+            <p className="text-rose-300 text-[10px]">
+              ⚠️ Insufficient STT for gas: holding {wallet.sttBalance ?? '0'} STT. Minimum recommended is 0.05 STT. Bridge STT from Shannon or request in Somnia Discord #dev-chat.
+            </p>
+          )}
+          {isWalletConnected && isCorrectNetwork && !hasCollateral && (
+            <p className="text-rose-300 text-[10px]">
+              ⚠️ Insufficient unlocked collateral in MarginBank: holding ${unlockedCollateralUsd.toFixed(2)} USDso. Required margin is ${imf.toFixed(2)} USDso. Bridge USDso from Shannon and deposit into MarginBank.
+            </p>
+          )}
+          {isWalletConnected && isCorrectNetwork && hasGasBalance && hasCollateral && (
+            <p className="text-emerald-300 text-[10px]">
+              ✓ Account funded & pre-flight checks passed. Orders require explicit wallet signature confirmation.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Passing preview disclaimer note */}
-      <div className="p-2 rounded bg-surface-subtle border border-surface-border flex items-start gap-1.5 text-[10px] text-slate-400 leading-tight">
-        <Info className="w-3 h-3 text-slate-500 flex-shrink-0 mt-0.5" />
-        <span>
-          A passing preview is not a guarantee of execution. Market conditions, mark prices, and account collateral can change.
-        </span>
+      <div className="p-2.5 rounded bg-surface-subtle border border-surface-border flex flex-col gap-1 text-[10px] text-slate-400 leading-tight">
+        <div className="flex items-start gap-1.5">
+          <Info className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0 mt-0.5" />
+          <span className="text-slate-300 font-medium">
+            A passing preview is not a guarantee of fill.
+          </span>
+        </div>
+        <p className="text-slate-400 pl-5">
+          • <strong className="text-slate-300">POST_ONLY</strong> guarantees maker execution upon acceptance, but resting orders remain subject to subsequent market fill risk until cancelled.
+        </p>
+        <p className="text-slate-400 pl-5">
+          • <strong className="text-slate-300">Cancellation</strong> stops resting orders, but does not close or reverse a position if the order has already matched.
+        </p>
       </div>
 
-      {/* Dry-Run Notice */}
-      <div className="p-2 rounded bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-[10px] text-amber-300">
+      {/* Execution Mode Notice */}
+      <div className={`p-2 rounded border flex items-center justify-between text-[10px] ${
+        executionMode === 'live'
+          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+          : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300'
+      }`}>
         <span className="flex items-center gap-1">
-          <ShieldCheck className="w-3 h-3 text-amber-400" />
-          <span>Strict Dry-Run Active</span>
+          <ShieldCheck className={`w-3 h-3 ${executionMode === 'live' ? 'text-emerald-400' : 'text-cyan-400'}`} />
+          <span>{executionMode === 'live' ? 'Live Testnet Execution' : 'Pre-Trade Simulation'}</span>
         </span>
-        <span className="font-mono text-[9px] uppercase tracking-wider text-amber-400/80">
-          DRY_RUN=true (No Write Calls)
+        <span className="font-mono text-[9px] uppercase tracking-wider font-bold">
+          {executionMode === 'live' ? 'WALLET_SIGNATURE_REQUIRED' : 'SIMULATION_ONLY (NO_BROADCAST)'}
         </span>
       </div>
 
       {/* Primary Action Button */}
-      <button
-        onClick={() => onSimulateOrder(proposal)}
-        disabled={!riskEval.isSafeToSimulate}
-        className={`w-full py-2.5 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md ${
-          !riskEval.isSafeToSimulate
-            ? 'bg-surface-subtle text-slate-500 border border-surface-border cursor-not-allowed'
-            : side === 'BUY_LONG'
-            ? 'bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-slate-950 shadow-[0_0_15px_rgba(0,229,153,0.25)]'
-            : 'bg-rose-500 hover:bg-rose-400 active:bg-rose-600 text-white shadow-[0_0_15px_rgba(255,77,106,0.25)]'
-        }`}
-      >
-        <span>Preview Order (Read-Only Simulation)</span>
-        <ArrowRight className="w-3.5 h-3.5" />
-      </button>
+      {executionMode === 'live' ? (
+        <button
+          onClick={() => onSimulateOrder(proposal, true)}
+          disabled={!isLiveReady}
+          className={`w-full py-2.5 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md ${
+            !isLiveReady
+              ? 'bg-surface-subtle text-slate-500 border border-surface-border cursor-not-allowed'
+              : side === 'BUY_LONG'
+              ? 'bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-slate-950 shadow-[0_0_15px_rgba(0,229,153,0.35)]'
+              : 'bg-rose-500 hover:bg-rose-400 active:bg-rose-600 text-white shadow-[0_0_15px_rgba(255,77,106,0.35)]'
+          }`}
+        >
+          <Lock className="w-3.5 h-3.5" />
+          <span>Review & Authorize Testnet Order</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      ) : (
+        <button
+          onClick={() => onSimulateOrder(proposal, false)}
+          disabled={!riskEval.isSafeToSimulate}
+          className={`w-full py-2.5 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md ${
+            !riskEval.isSafeToSimulate
+              ? 'bg-surface-subtle text-slate-500 border border-surface-border cursor-not-allowed'
+              : side === 'BUY_LONG'
+              ? 'bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-slate-950 shadow-[0_0_15px_rgba(0,229,153,0.25)]'
+              : 'bg-rose-500 hover:bg-rose-400 active:bg-rose-600 text-white shadow-[0_0_15px_rgba(255,77,106,0.25)]'
+          }`}
+        >
+          <span>Preview Order (Simulation Only)</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      )}
     </div>
   );
 };

@@ -15,7 +15,7 @@ import { OrderProposal } from './types.js';
 import { evaluateOrderRisk } from './utils/riskEngine.js';
 
 export const App: React.FC = () => {
-  const { wallet, connect, disconnect, switchToHideki } = useWallet();
+  const { wallet, connect, disconnect, switchToHideki, getWalletClient } = useWallet();
   const {
     markets,
     selectedMarket,
@@ -31,6 +31,7 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'terminal' | 'cockpit' | 'markets' | 'diagnostics'>('terminal');
   const [selectedBookPrice, setSelectedBookPrice] = useState<number | undefined>(undefined);
   const [selectedProposalForModal, setSelectedProposalForModal] = useState<OrderProposal | null>(null);
+  const [isLiveModeForModal, setIsLiveModeForModal] = useState<boolean>(false);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [recentSimulations, setRecentSimulations] = useState<OrderProposal[]>([]);
 
@@ -57,14 +58,16 @@ export const App: React.FC = () => {
     selectedMarket.minOrderQty,
   );
 
-  const handleSimulateOrder = (proposal: OrderProposal) => {
+  const handleSimulateOrder = (proposal: OrderProposal, isLiveMode?: boolean) => {
     setRecentSimulations((prev) => [proposal, ...prev.slice(0, 19)]);
     setSelectedProposalForModal(proposal);
+    setIsLiveModeForModal(!!isLiveMode);
     setIsModalOpen(true);
   };
 
   const handleInspectSimulation = (proposal: OrderProposal) => {
     setSelectedProposalForModal(proposal);
+    setIsLiveModeForModal(false);
     setIsModalOpen(true);
   };
 
@@ -180,6 +183,9 @@ export const App: React.FC = () => {
           proposal={selectedProposalForModal}
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
+          isLiveMode={isLiveModeForModal}
+          wallet={wallet}
+          getWalletClient={getWalletClient}
         />
       )}
     </div>
